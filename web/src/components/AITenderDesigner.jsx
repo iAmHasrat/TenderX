@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { generateCriteriaWithLLM, validateCriteriaWeights } from '../services/aiService';
+import { generateCriteriaWithLLM, validateCriteriaWeights, generateCriteriaFromDescription } from '../services/aiService';
 import { Sparkles, ArrowLeft, CheckCircle2, Sliders, FilePlus, Check, Key, Bot, Settings2, Trash2 } from 'lucide-react';
 
 export default function AITenderDesigner({ onPublishTender, onCancel }) {
@@ -76,13 +76,21 @@ export default function AITenderDesigner({ onPublishTender, onCancel }) {
 
       setCriteria(generated);
       if (apiKey.trim()) {
-        setLlmStatusNote(`Generated via live ${llmProvider.toUpperCase()} API response!`);
+        setLlmStatusNote(`✅ Generated via live ${llmProvider.toUpperCase()} API response!`);
       } else {
-        setLlmStatusNote('Generated via Built-in Intelligent Schema Engine (Enter API Key for Live Gemini/Grok).');
+        setLlmStatusNote('⚡ Generated via Built-in Intelligent Schema Engine (Enter API Key in Settings for live Gemini/Grok).');
       }
     } catch (err) {
       console.error("AI Generation error:", err);
-      setLlmStatusNote('Smart Fallback Engine generated criteria.');
+      // Fallback safely to heuristic engine so UI never breaks
+      const fallback = generateCriteriaFromDescription({
+        description,
+        category,
+        budget: Number(budget),
+        days: Number(timelineDays)
+      });
+      setCriteria(fallback);
+      setLlmStatusNote(`⚠️ Live ${llmProvider.toUpperCase()} Error: ${err.message || 'Call failed'}. Switched to Smart Heuristic Engine.`);
     } finally {
       setIsGenerating(false);
     }

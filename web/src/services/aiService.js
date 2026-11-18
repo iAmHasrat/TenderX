@@ -10,12 +10,13 @@ export async function generateCriteriaWithLLM({ description, category, budget, d
         return await callGeminiAPI({ description, category, budget, days, apiKey });
       }
     } catch (err) {
-      console.warn("Live LLM API call failed, falling back to smart engine:", err);
-      // Gracefully fall through to smart heuristic generator
+      console.warn("Live LLM API call failed:", err);
+      // Re-throw with descriptive message so the UI can inform the user
+      throw err;
     }
   }
 
-  // Fallback / Default Smart Heuristic Generator
+  // Fallback / Default Smart Heuristic Generator (when no API key is provided)
   return generateCriteriaFromDescription({ description, category, budget, days });
 }
 
@@ -117,11 +118,28 @@ Return ONLY JSON.`;
 }
 
 function cleanJsonString(str) {
-  let s = str.trim();
-  if (s.startsWith('```json')) s = s.substring(7);
-  else if (s.startsWith('```')) s = s.substring(3);
-  if (s.endsWith('```')) s = s.substring(0, s.length - 3);
-  return s.trim();
+  let s = (str || '').trim();
+  const match = s.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (match) {
+    return match[1].trim();
+  }
+  const firstBrace = s.indexOf('{');
+  const firstBracket = s.indexOf('[');
+  let start = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    start = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    start = firstBrace;
+  } else if (firstBracket !== -1) {
+    start = firstBracket;
+  }
+  const lastBrace = s.lastIndexOf('}');
+  const lastBracket = s.lastIndexOf(']');
+  const end = Math.max(lastBrace, lastBracket);
+  if (start !== -1 && end !== -1 && end > start) {
+    return s.substring(start, end + 1);
+  }
+  return s;
 }
 
 function normalizeCriteria(list) {
